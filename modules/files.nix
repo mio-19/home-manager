@@ -79,21 +79,31 @@ in
             (mapAttrsToList (n: v: v.target)
             (filterAttrs (n: v: v.force) cfg));
 
+        copiedPaths =
+          concatMapStringsSep " " (p: ''"$HOME"/${escapeShellArg p}'')
+            (mapAttrsToList (n: v: v.target)
+            (filterAttrs (n: v: v.mode != "symlink") cfg));
+
         storeDir = escapeShellArg builtins.storeDir;
 
         check = pkgs.substituteAll {
           src = ./files/check-link-targets.sh;
 
           inherit (config.lib.bash) initHomeManagerLib;
-          inherit forcedPaths storeDir;
+          inherit forcedPaths copiedPaths storeDir;
         };
       in
       ''
         function checkNewGenCollision() {
-          local newGenFiles
+          local newGenFiles oldGenFiles
           newGenFiles="$(readlink -e "$newGenPath/home-files")"
+          if [[ ! -v oldGenPath || ! -e "$oldGenPath/home-files" ]] ; then
+             oldGenFiles=""
+          else
+             oldGenFiles="$(readlink -e "$oldGenPath/home-files")"
+          fi
           find "$newGenFiles" \( -type f -or -type l \) \
-              -exec bash ${check} "$newGenFiles" {} +
+              -exec bash ${check} "$newGenFiles" "$oldGenFiles" {} +
         }
 
         checkNewGenCollision || exit 1
@@ -108,7 +118,7 @@ in
     # 2. Switch over the Home Manager gcroot and current profile
     #    links.
     #
-    # 3. Symlink files from the new generation into $HOME.
+    # 3. Symlink/copy files from the new generation into $HOME.
     #
     # This order is needed to ensure that we always know which links
     # belong to which generation. Specifically, if we're moving from
@@ -123,8 +133,12 @@ in
     # source and target generation.
     home.activation.linkGeneration = hm.dag.entryAfter ["writeBoundary"] (
       let
+        modes = lib.toShellVar "modes"
+          (lib.mapAttrs' (n: v: lib.nameValuePair v.target v.mode) cfg);
+
         link = pkgs.replaceVars ./files/link.sh {
           inherit (config.lib.bash) initHomeManagerLib;
+          inherit modes;
         };
 
         storeDir = escapeShellArg builtins.storeDir;
@@ -138,10 +152,15 @@ in
           function linkNewGen() {
             _i "Creating home file links in %s" "$HOME"
 
-            local newGenFiles
+            local newGenFiles oldGenFiles
             newGenFiles="$(readlink -e "$newGenPath/home-files")"
+            if [[ ! -v oldGenPath || ! -e "$oldGenPath/home-files" ]] ; then
+              oldGenFiles=""
+            else
+              oldGenFiles="$(readlink -e "$oldGenPath/home-files")"
+            fi
             find "$newGenFiles" \( -type f -or -type l \) \
-              -exec bash ${link} "$newGenFiles" {} +
+              -exec bash ${link} "$newGenFiles" "$oldGenFiles" {} +
           }
 
           function cleanOldGen() {

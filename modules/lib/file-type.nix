@@ -130,7 +130,7 @@ in
 
             force = mkOption {
               type = types.bool;
-              default = false;
+              default = true;
               description = ''
                 Whether the target path should be unconditionally replaced
                 by the managed file source. Warning, this will silently
@@ -141,7 +141,7 @@ in
 
             mode = mkOption {
               type = types.str;
-              default = "symlink";
+              default = "u+rwX";
               example = "0600";
               description = ''
                 If set to something else than `symlink`,

@@ -79,7 +79,7 @@ for sourcePath in "$@" ; do
     # Copy that file, --force
     # This can still fail if the target is a directory, in which case we bail out.
     run mkdir -p $VERBOSE_ARG "$(dirname "$targetPath")"
-    run cp -TLf $VERBOSE_ARG "$sourcePath" "$targetPath" || exit 1
-    run chmod $VERBOSE_ARG $mode "$targetPath"
+    run cp -TLfr $VERBOSE_ARG "$sourcePath" "$targetPath" || exit 1
+    run chmod -R $VERBOSE_ARG $mode "$targetPath"
   fi
 done
